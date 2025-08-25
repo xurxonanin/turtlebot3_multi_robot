@@ -102,25 +102,27 @@ def generate_launch_description():
  
     remappings = [('tf', '/tf'),
                   ('tf_static', '/tf_static')]
-    map_server=Node(package='nav2_map_server',
-        executable='map_server',
-        name='map_server',
-        output='screen',
-        parameters=[{'yaml_filename': os.path.join(get_package_share_directory('turtlebot3_navigation2'), 'map', 'map.yaml'),
-                     },],
-        remappings=remappings)
+    
+    # We are using namespaced map servers for each robot now
+    # map_server=Node(package='nav2_map_server',
+    #     executable='map_server',
+    #     name='map_server',
+    #     output='screen',
+    #     parameters=[{'yaml_filename': os.path.join(get_package_share_directory('turtlebot3_navigation2'), 'map', 'map.yaml'),
+    #                  },],
+    #     remappings=remappings)
 
-    map_server_lifecyle=Node(package='nav2_lifecycle_manager',
-            executable='lifecycle_manager',
-            name='lifecycle_manager_map_server',
-            output='screen',
-            parameters=[{'use_sim_time': use_sim_time},
-                        {'autostart': True},
-                        {'node_names': ['map_server']}])
+    # map_server_lifecyle=Node(package='nav2_lifecycle_manager',
+    #         executable='lifecycle_manager',
+    #         name='lifecycle_manager_map_server',
+    #         output='screen',
+    #         parameters=[{'use_sim_time': use_sim_time},
+    #                     {'autostart': True},
+    #                     {'node_names': ['map_server']}])
 
 
-    ld.add_action(map_server)
-    ld.add_action(map_server_lifecyle)
+    # ld.add_action(map_server)
+    # ld.add_action(map_server_lifecyle)
 
     ######################
 
@@ -168,11 +170,11 @@ def generate_launch_description():
                 PythonLaunchDescriptionSource(
                     os.path.join(nav_launch_dir, 'bringup_launch.py')),
                     launch_arguments={  
-                                    'slam': 'False',
+                                    'slam': 'True',
                                     'namespace': ns,
                                     'use_namespace': 'True',
                                     'map': '',
-                                    'map_server': 'False',
+                                    # 'map_server': 'False',
                                     'params_file': current_params,
                                     'default_bt_xml_filename': os.path.join(
                                         get_package_share_directory('nav2_bt_navigator'),
@@ -226,6 +228,20 @@ def generate_launch_description():
             output='screen'
         )
 
+        # Include odom_broadcaster for each robot
+        odom_broadcaster_cmd = Node(
+            package='odom_tf_broadcaster',
+            executable='odom_tf_broadcaster',
+            namespace=ns,
+            output='screen',
+            parameters=[{
+                'odom_topic': f'/{ns}/odom',
+                'odom_frame': f'{ns}/odom',
+                'base_frame': f'{ns}/base_footprint',  # matches your AMCL base_frame_id
+            }]
+        )
+
+
         rviz_cmd = IncludeLaunchDescription(
             PythonLaunchDescriptionSource(
                 os.path.join(nav_launch_dir, 'rviz_launch.py')),
@@ -247,7 +263,7 @@ def generate_launch_description():
         post_spawn_event = RegisterEventHandler(
             event_handler=OnProcessExit(
                 target_action=last_action,
-                on_exit=[initial_pose_node, rviz_cmd, drive_turtlebot3_waffle],
+                on_exit=[initial_pose_node, odom_broadcaster_cmd, rviz_cmd, drive_turtlebot3_waffle],
             )
         )
 
